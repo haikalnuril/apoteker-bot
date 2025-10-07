@@ -1,0 +1,20 @@
+services:
+    whatsapp:
+        image: aldinokemal2104/go-whatsapp-web-multidevice
+        container_name: whatsapp
+        restart: always
+        ports:
+            - "${GOWA_PORT}:${GOWA_PORT}"
+        volumes:
+            - D:\HAIKAL NURIL\Project\apoteker-bot:/storages
+        environment:
+            - APP_BASIC_AUTH=${GOWA_USERNAME}:${GOWA_PASSWORD}
+            - APP_PORT=${GOWA_PORT}
+            - APP_DEBUG=true
+            - APP_OS=Chrome
+            - WHATSAPP_AUTO_REPLY="Auto reply message"
+            - WHATSAPP_AUTO_MARK_READ=false
+            - WHATSAPP_WEBHOOK=${WHATSAPP_WEBHOOK_URL}
+            - WHATSAPP_WEBHOOK_SECRET=super-secret-key
+            - WHATSAPP_ACCOUNT_VALIDATION=true
+            - WHATSAPP_CHAT_STORAGE=true
