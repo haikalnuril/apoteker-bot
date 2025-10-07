@@ -119,7 +119,7 @@ func (uc *messageUseCase) parseOrderMessage(message, from string) (*model.OrderD
 
 // Send message via WhatsApp API
 func (uc *messageUseCase) SendMessage(phoneNumber, message string) error {
-	url := fmt.Sprintf("%s/send", config.LoadConfig().WhatsAppAPIURL)
+	url := fmt.Sprintf("%s/send/message", config.LoadConfig().WhatsAppAPIURL)
 
 	payload := map[string]string{
 		"phone":   phoneNumber,
@@ -128,7 +128,17 @@ func (uc *messageUseCase) SendMessage(phoneNumber, message string) error {
 
 	jsonData, _ := json.Marshal(payload)
 
-	resp, err := http.Post(url, "application/json", strings.NewReader(string(jsonData)))
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(jsonData)))
+	if err != nil {
+		return &exception.InternalServerError{Message: "Internal Server Error"}
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Add basic auth
+	req.SetBasicAuth(config.LoadConfig().GowaAdmin, config.LoadConfig().GowaPassword)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return &exception.InternalServerError{Message: "Internal Server Error"}
 	}

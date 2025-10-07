@@ -9,10 +9,12 @@ import (
 )
 
 type Config struct {
-    AppPort          string
-    WhatsAppAPIURL   string
-    AllowedNumber    string
-    ExcelOutputPath  string
+	AppPort         string
+	WhatsAppAPIURL  string
+	AllowedNumber   string
+	ExcelOutputPath string
+	GowaAdmin       string
+	GowaPassword    string
 }
 
 func LoadConfig() *Config {
@@ -23,10 +25,12 @@ func LoadConfig() *Config {
 
 	c := &Config{}
 	return &Config{
-        AppPort:         c.Get("APP_PORT", "8080"),
-        WhatsAppAPIURL:  c.Get("WHATSAPP_API_URL", "http://localhost:3000"),
-        AllowedNumber:   c.Get("ALLOWED_NUMBER", "089123456789"),
-        ExcelOutputPath: c.Get("EXCEL_OUTPUT_PATH", "./storage/orders.xlsx"),
+		AppPort:         c.Get("APP_PORT", "8080"),
+		WhatsAppAPIURL:  c.Get("WHATSAPP_API_URL", "http://localhost:3000"),
+		AllowedNumber:   c.Get("ALLOWED_NUMBER", "089123456789"),
+		ExcelOutputPath: c.Get("EXCEL_OUTPUT_PATH", "./storage/orders.xlsx"),
+		GowaAdmin:       c.Get("GOWA_USERNAME", "admin"),
+		GowaPassword:    c.Get("GOWA_PASSWORD", "password"),
 	}
 }
 
