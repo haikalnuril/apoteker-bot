@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"fmt"
+	"telegram-doctor-recipe-helper-bot/internal/app/config"
 	"telegram-doctor-recipe-helper-bot/internal/app/model"
 	"telegram-doctor-recipe-helper-bot/internal/modules/bot/usecase"
 
@@ -18,22 +18,9 @@ func NewBotController(useCase usecase.MessageUseCase) *BotController {
 	}
 }
 
-type WebhookPayload struct {
-	MessageID string `json:"message_id"`
-	From      string `json:"from"`
-	Message   string `json:"message"`
-	Timestamp int64  `json:"timestamp"`
-	// Add other fields based on the actual webhook structure
-	PushName string `json:"pushname,omitempty"`
-	Type     string `json:"type,omitempty"`
-}
-
 // Webhook to receive incoming messages
 func (ctrl *BotController) HandleWebhook(c *fiber.Ctx) error {
-	var payload WebhookPayload
-
-	// Log raw body for debugging
-	fmt.Printf("Received webhook: %s\n", string(c.Body()))
+	var payload usecase.WebhookMessage
 
 	if err := c.BodyParser(&payload); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(model.Response{
@@ -42,8 +29,13 @@ func (ctrl *BotController) HandleWebhook(c *fiber.Ctx) error {
 		})
 	}
 
-	// Log parsed payload
-	fmt.Printf("Parsed payload: %+v\n", payload)
+	// Check if from allowed number BEFORE processing
+	if payload.SenderID != config.LoadConfig().AllowedNumber {
+		return c.JSON(model.Response{
+			Code:    200,
+			Message: "Message ignored - unauthorized sender",
+		})
+	}
 
 	// Process the incoming message through use case
 	if err := ctrl.useCase.ProcessWebhookMessage(&payload); err != nil {

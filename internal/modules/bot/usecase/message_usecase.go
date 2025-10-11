@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -15,7 +16,7 @@ import (
 )
 
 type MessageUseCase interface {
-	ProcessWebhookMessage(payload interface{}) error
+	ProcessWebhookMessage(payload *WebhookMessage) error
 	SendMessage(phoneNumber, message string) error
 }
 
@@ -31,59 +32,46 @@ func NewMessageUseCase(repo repository.MessageRepository) MessageUseCase {
 
 // WebhookMessage represents the structure from the webhook
 type WebhookMessage struct {
-	MessageID string `json:"message_id"`
-	From      string `json:"from"`
-	Message   string `json:"message"`
-	Timestamp int64  `json:"timestamp"`
-	PushName  string `json:"pushname,omitempty"`
-	Type      string `json:"type,omitempty"`
+	ChatID    string         `json:"chat_id"`
+	From      string         `json:"from"`
+	Message   MessageContent `json:"message"`
+	PushName  string         `json:"pushname"`
+	SenderID  string         `json:"sender_id"`
+	Timestamp string         `json:"timestamp"`
+}
+
+// MessageContent represents the message object structure
+type MessageContent struct {
+	Text          string `json:"text"`
+	ID            string `json:"id"`
+	RepliedID     string `json:"replied_id"`
+	QuotedMessage string `json:"quoted_message"`
 }
 
 // ProcessWebhookMessage handles incoming webhook messages
-func (uc *messageUseCase) ProcessWebhookMessage(payload interface{}) error {
-	// Type assertion to get the webhook message
-	webhookData, ok := payload.(*WebhookMessage)
-	if !ok {
-		return &exception.BadRequestError{Message: "Invalid webhook payload type"}
+func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) error {
+	// Use sender_id directly (no need to parse)
+	phoneNumber := webhookData.SenderID
+
+	// The validation is now done in the controller, so we can skip it here
+	// But we can add a safety check
+	if phoneNumber != config.LoadConfig().AllowedNumber {
+		return nil // This shouldn't happen as controller already checked
 	}
 
-	// Extract phone number (remove @s.whatsapp.net or @c.us)
-	phoneNumber := strings.Split(webhookData.From, "@")[0]
+	// Get the actual message text from the message object
+	messageText := webhookData.Message.Text
 
-	// Check if from allowed number
-	if phoneNumber != config.LoadConfig().AllowedNumber {
-		// Optionally log or ignore messages from other numbers
+	// Skip empty messages
+	if strings.TrimSpace(messageText) == "" {
 		return nil
 	}
-
-	// Only process text messages
-	if webhookData.Type != "" && webhookData.Type != "text" {
-		return nil // Ignore non-text messages
-	}
-
-	// Parse message
-	orderData, err := uc.parseOrderMessage(webhookData.Message, phoneNumber)
-	if err != nil {
-		// Send error message back to user
-		errorMsg := "❌ Invalid format! Please use:\nname: [name], order: [order], phone number: [number]"
-		uc.SendMessage(phoneNumber, errorMsg)
-		return nil // Don't return error to avoid webhook retry
-	}
-
-	// Save to Excel
-	if err := uc.repo.SaveToExcel(orderData); err != nil {
-		return err
-	}
-
-	// Send confirmation
-	confirmMsg := fmt.Sprintf("✅ Order received!\nName: %s\nOrder: %s\nPhone: %s",
-		orderData.Name, orderData.Recipe, orderData.PhoneNumber)
-
-	return uc.SendMessage(phoneNumber, confirmMsg)
+	
+	return uc.SendMessage(phoneNumber, "Thank you for your message. We have received it and will process your order shortly.")
 }
 
 // Parse message with pattern: name:..., order:..., phone number:...
-func (uc *messageUseCase) parseOrderMessage(message, from string) (*model.OrderData, error) {
+func (uc *messageUseCase) parseOrderMessage(message string) (*model.OrderData, error) {
 	// Convert to lowercase for easier parsing
 	lowerMsg := strings.ToLower(message)
 
@@ -124,15 +112,33 @@ func (uc *messageUseCase) SendMessage(phoneNumber, message string) error {
 		return &exception.InternalServerError{Message: "Failed to marshal message"}
 	}
 
-	// Send POST request
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	// Create HTTP request
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return &exception.InternalServerError{Message: "Failed to send message"}
+		fmt.Printf("Failed to create request: %v\n", err)
+		return &exception.InternalServerError{Message: "Failed to create request"}
+	}
+
+	// Add headers
+	req.Header.Set("Content-Type", "application/json")
+
+	// Add Basic Auth (username: admin, password: admin)
+	req.SetBasicAuth("admin", "admin")
+
+	// Send request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("HTTP request failed: %v\n", err)
+		return &exception.InternalServerError{Message: "Failed to send message: " + err.Error()}
 	}
 	defer resp.Body.Close()
 
+	// Read response body for debugging
+	body, _ := io.ReadAll(resp.Body)
+
 	if resp.StatusCode != http.StatusOK {
-		return &exception.InternalServerError{Message: "WhatsApp API returned error"}
+		return &exception.InternalServerError{Message: fmt.Sprintf("WhatsApp API returned error: %d - %s", resp.StatusCode, string(body))}
 	}
 
 	return nil
