@@ -10,6 +10,7 @@ import (
 	"strings"
 	"telegram-doctor-recipe-helper-bot/internal/app/config"
 	"telegram-doctor-recipe-helper-bot/internal/app/exception"
+	"telegram-doctor-recipe-helper-bot/internal/app/utils"
 	"telegram-doctor-recipe-helper-bot/internal/app/model"
 	"telegram-doctor-recipe-helper-bot/internal/modules/bot/repository"
 	"time"
@@ -23,6 +24,14 @@ type MessageUseCase interface {
 type messageUseCase struct {
 	repo repository.MessageRepository
 }
+
+// --- Define the conversation states as constants for safety ---
+const (
+	StateAwaitingStart        = "AWAITING_START"
+	StateAwaitingMenuChoice   = "AWAITING_MENU_CHOICE"
+	StateAwaitingFormSubmission = "AWAITING_FORM_SUBMISSION"
+	StateAwaitingConfirmation = "AWAITING_CONFIRMATION"
+)
 
 func NewMessageUseCase(repo repository.MessageRepository) MessageUseCase {
 	return &messageUseCase{
@@ -48,26 +57,83 @@ type MessageContent struct {
 	QuotedMessage string `json:"quoted_message"`
 }
 
-// ProcessWebhookMessage handles incoming webhook messages
+// ProcessWebhookMessage handles incoming webhook messages using a state machine
 func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) error {
-	// Use sender_id directly (no need to parse)
 	phoneNumber := webhookData.SenderID
-
-	// The validation is now done in the controller, so we can skip it here
-	// But we can add a safety check
-	if phoneNumber != config.LoadConfig().AllowedNumber {
-		return nil // This shouldn't happen as controller already checked
-	}
-
-	// Get the actual message text from the message object
 	messageText := webhookData.Message.Text
 
-	// Skip empty messages
+	// Skip empty or unauthorized messages (assuming initial check is still elsewhere)
 	if strings.TrimSpace(messageText) == "" {
 		return nil
 	}
-	
-	return uc.SendMessage(phoneNumber, "Thank you for your message. We have received it and will process your order shortly.")
+	if phoneNumber != config.LoadConfig().AllowedNumber {
+		return nil
+	}
+
+	// 1. Get the user's current state
+	currentUserState := utils.GetOrCreateUserState(phoneNumber)
+
+	// 2. Validate the message against the current state
+	isValid, data, errorMessage := utils.ValidateMessageForState(currentUserState.State, messageText)
+
+	// 3. Act on the validation result
+	if !isValid {
+		// If not valid, just send the specific error message and do nothing else
+		return uc.SendMessage(phoneNumber, errorMessage)
+	}
+
+	// --- If VALID, process the request based on the current state ---
+	switch currentUserState.State {
+	case StateAwaitingStart:
+		// User sent /start
+		welcomeMessage := "hello, this is doctor to pharmacy bot.\n[1] Send message to pharmacy\n[2] Get Spreadsheet link\n\nAnswer with number only!"
+		uc.SendMessage(phoneNumber, welcomeMessage)
+		currentUserState.State = StateAwaitingMenuChoice // <-- State Transition
+
+	case StateAwaitingMenuChoice:
+		choice := data.(string)
+		if choice == "1" {
+			formFormat := "Please send patient details in the format:\n`Patient Name: [Name], Medication: [Drug], Dosage: [Dosage]`"
+			uc.SendMessage(phoneNumber, formFormat)
+			currentUserState.State = StateAwaitingFormSubmission // <-- State Transition
+		} else if choice == "2" {
+			uc.SendMessage(phoneNumber, "Here is the spreadsheet link: [Your Link Here]")
+			uc.SendMessage(phoneNumber, "Session complete.")
+			// uc.CloseChat(phoneNumber) // Assuming you have a close function
+			utils.ResetUserState(phoneNumber) // <-- Reset State
+		}
+
+	case StateAwaitingFormSubmission:
+		if cmd, ok := data.(string); ok && cmd == "cancel" {
+			welcomeMessage := "[1] Send message to pharmacy\n[2] Get Spreadsheet link"
+			uc.SendMessage(phoneNumber, "Request cancelled. Returning to the main menu.\n\n"+welcomeMessage)
+			currentUserState.State = StateAwaitingMenuChoice // <-- State Transition
+			return nil
+		}
+		// Store the original message text for confirmation
+		currentUserState.PendingMessage = messageText
+		confirmationPrompt := fmt.Sprintf("Please confirm the following request is correct:\n\n`%s`\n\nIs this correct? (Y/N)", messageText)
+		uc.SendMessage(phoneNumber, confirmationPrompt)
+		currentUserState.State = StateAwaitingConfirmation // <-- State Transition
+
+	case StateAwaitingConfirmation:
+		decision := data.(string)
+		if decision == "Y" {
+			// **SEND TO PHARMACY LOGIC HERE**
+			// pharmacyNumber := "PHARMACY_PHONE_NUMBER"
+			// uc.SendMessage(pharmacyNumber, currentUserState.PendingMessage)
+
+			uc.SendMessage(phoneNumber, "Your request was sent to the pharmacy. Session complete.")
+			// uc.CloseChat(phoneNumber)
+			utils.ResetUserState(phoneNumber) // <-- Reset State
+		} else if decision == "N" {
+			formFormat := "Request cancelled. Please submit the form again with the correct details:\n`Patient Name: [Name], Medication: [Drug], Dosage: [Dosage]`"
+			uc.SendMessage(phoneNumber, formFormat)
+			currentUserState.State = StateAwaitingFormSubmission // <-- State Transition
+		}
+	}
+
+	return nil
 }
 
 // Parse message with pattern: name:..., order:..., phone number:...
