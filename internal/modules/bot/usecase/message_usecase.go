@@ -93,11 +93,12 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 	case StateAwaitingMenuChoice:
 		choice := data.(string)
 		if choice == "1" {
-			formFormat := "Please send patient details in the format:\n`Patient Name: [Name], Medication: [Drug], Dosage: [Dosage]`"
+			formFormat := "Please send patient details in the format:\n`Patient Name: [Name]\nMedication: [Drug]\nDosage: [Dosage]`"
 			uc.SendMessage(phoneNumber, formFormat)
 			currentUserState.State = StateAwaitingFormSubmission // <-- State Transition
 		} else if choice == "2" {
-			uc.SendMessage(phoneNumber, "Here is the spreadsheet link: [Your Link Here]")
+			message := fmt.Sprintf("Here is the spreadsheet link: %s", config.LoadConfig().SheetLink)
+			uc.SendMessage(phoneNumber, message)
 			uc.SendMessage(phoneNumber, "Session complete.")
 			// uc.CloseChat(phoneNumber) // Assuming you have a close function
 			utils.ResetUserState(phoneNumber) // <-- Reset State

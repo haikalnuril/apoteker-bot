@@ -15,6 +15,7 @@ type Config struct {
 	ExcelOutputPath string
 	GowaAdmin       string
 	GowaPassword    string
+	SheetLink       string
 }
 
 func LoadConfig() *Config {
@@ -31,6 +32,7 @@ func LoadConfig() *Config {
 		ExcelOutputPath: c.Get("EXCEL_OUTPUT_PATH", "./storage/orders.xlsx"),
 		GowaAdmin:       c.Get("GOWA_USERNAME", "admin"),
 		GowaPassword:    c.Get("GOWA_PASSWORD", "password"),
+		SheetLink:       c.Get("SHEET_LINK", ""),
 	}
 }
 
