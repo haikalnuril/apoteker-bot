@@ -16,6 +16,7 @@ type Config struct {
 	GowaAdmin       string
 	GowaPassword    string
 	SheetLink       string
+	PharmacyNumber  string
 }
 
 func LoadConfig() *Config {
@@ -33,6 +34,7 @@ func LoadConfig() *Config {
 		GowaAdmin:       c.Get("GOWA_USERNAME", "admin"),
 		GowaPassword:    c.Get("GOWA_PASSWORD", "password"),
 		SheetLink:       c.Get("SHEET_LINK", ""),
+		PharmacyNumber:  c.Get("PHARMACY_NUMBER", "089123456789"),
 	}
 }
 

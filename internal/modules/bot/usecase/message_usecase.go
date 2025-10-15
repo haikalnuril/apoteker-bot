@@ -86,7 +86,7 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 	switch currentUserState.State {
 	case StateAwaitingStart:
 		// User sent /start
-		welcomeMessage := "hello, this is doctor to pharmacy bot.\n[1] Send message to pharmacy\n[2] Get Spreadsheet link\n\nAnswer with number only!"
+		welcomeMessage := "hello, this is doctor to pharmacy bot.\n[1] Send message to pharmacy\n[2] Get Spreadsheet link\n[3] Cancel\n\nAnswer with number only!"
 		uc.SendMessage(phoneNumber, welcomeMessage)
 		currentUserState.State = StateAwaitingMenuChoice // <-- State Transition
 
@@ -102,11 +102,15 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 			uc.SendMessage(phoneNumber, "Session complete.")
 			// uc.CloseChat(phoneNumber) // Assuming you have a close function
 			utils.ResetUserState(phoneNumber) // <-- Reset State
+		} else if choice == "3" {
+			uc.SendMessage(phoneNumber, "Session cancelled. To start again, send `/start`.")
+			// uc.CloseChat(phoneNumber) // Assuming you have a close function
+			utils.ResetUserState(phoneNumber) // <-- Reset State
 		}
 
 	case StateAwaitingFormSubmission:
 		if cmd, ok := data.(string); ok && cmd == "cancel" {
-			welcomeMessage := "[1] Send message to pharmacy\n[2] Get Spreadsheet link"
+			welcomeMessage := "[1] Send message to pharmacy\n[2] Get Spreadsheet link\n[3] Cancel\n\nAnswer with number only!"
 			uc.SendMessage(phoneNumber, "Request cancelled. Returning to the main menu.\n\n"+welcomeMessage)
 			currentUserState.State = StateAwaitingMenuChoice // <-- State Transition
 			return nil
@@ -121,9 +125,14 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 		decision := data.(string)
 		if decision == "Y" {
 			// **SEND TO PHARMACY LOGIC HERE**
-			// pharmacyNumber := "PHARMACY_PHONE_NUMBER"
-			// uc.SendMessage(pharmacyNumber, currentUserState.PendingMessage)
-
+			pharmacyNumber := config.LoadConfig().PharmacyNumber
+			// Send the pending message to the pharmacy number
+			msgToPharmacy := fmt.Sprintf("New prescription request:\n\n%s", currentUserState.PendingMessage)
+			err := uc.SendMessage(pharmacyNumber, msgToPharmacy)
+			if err != nil {
+				uc.SendMessage(phoneNumber, "Failed to send the request to the pharmacy. Please try again later.")
+				return err
+			}			
 			uc.SendMessage(phoneNumber, "Your request was sent to the pharmacy. Session complete.")
 			// uc.CloseChat(phoneNumber)
 			utils.ResetUserState(phoneNumber) // <-- Reset State

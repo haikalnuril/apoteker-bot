@@ -26,10 +26,10 @@ func ValidateMessageForState(state string, message string) (bool, interface{}, s
 		return false, nil, "To start a new session, please send `/start`."
 
 	case StateAwaitingMenuChoice:
-		if message == "1" || message == "2" {
+		if message == "1" || message == "2" || message == "3" {
 			return true, message, ""
 		}
-		return false, nil, "Invalid input. Please reply with `1` or `2`."
+		return false, nil, "Invalid input. Please reply with `1`, `2`, or `3`."
 
 	case StateAwaitingFormSubmission:
 		if strings.ToLower(message) == "cancel" {
