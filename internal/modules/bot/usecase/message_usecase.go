@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
 	"telegram-doctor-recipe-helper-bot/internal/app/config"
 	"telegram-doctor-recipe-helper-bot/internal/app/exception"
-	"telegram-doctor-recipe-helper-bot/internal/app/utils"
 	"telegram-doctor-recipe-helper-bot/internal/app/model"
+	"telegram-doctor-recipe-helper-bot/internal/app/utils"
 	"telegram-doctor-recipe-helper-bot/internal/modules/bot/repository"
 	"time"
 )
@@ -27,10 +28,10 @@ type messageUseCase struct {
 
 // --- Define the conversation states as constants for safety ---
 const (
-	StateAwaitingStart        = "AWAITING_START"
-	StateAwaitingMenuChoice   = "AWAITING_MENU_CHOICE"
+	StateAwaitingStart          = "AWAITING_START"
+	StateAwaitingMenuChoice     = "AWAITING_MENU_CHOICE"
 	StateAwaitingFormSubmission = "AWAITING_FORM_SUBMISSION"
-	StateAwaitingConfirmation = "AWAITING_CONFIRMATION"
+	StateAwaitingConfirmation   = "AWAITING_CONFIRMATION"
 )
 
 func NewMessageUseCase(repo repository.MessageRepository) MessageUseCase {
@@ -56,6 +57,9 @@ type MessageContent struct {
 	RepliedID     string `json:"replied_id"`
 	QuotedMessage string `json:"quoted_message"`
 }
+
+var Queue = 1
+var DateNow = time.Now().Format("2006-01-02")
 
 // ProcessWebhookMessage handles incoming webhook messages using a state machine
 func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) error {
@@ -93,7 +97,7 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 	case StateAwaitingMenuChoice:
 		choice := data.(string)
 		if choice == "1" {
-			formFormat := "Please send patient details in the format:\n`Patient Name: [Name]\nMedication: [Drug]\nDosage: [Dosage]`"
+			formFormat := "Please send patient details in the format:\nDoctor Name: [Name]\nPatient Name: [Name]\nPatient Birth Date: [Date]\nMedication: [Drug]\nPatient Phone Number: [Number using 62]"
 			uc.SendMessage(phoneNumber, formFormat)
 			currentUserState.State = StateAwaitingFormSubmission // <-- State Transition
 		} else if choice == "2" {
@@ -117,27 +121,55 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 		}
 		// Store the original message text for confirmation
 		currentUserState.PendingMessage = messageText
-		confirmationPrompt := fmt.Sprintf("Please confirm the following request is correct:\n\n`%s`\n\nIs this correct? (Y/N)", messageText)
+		confirmationPrompt := fmt.Sprintf("Please confirm the following request is correct:\n\n%s\n\nIs this correct? (Y/N)", messageText)
 		uc.SendMessage(phoneNumber, confirmationPrompt)
 		currentUserState.State = StateAwaitingConfirmation // <-- State Transition
 
 	case StateAwaitingConfirmation:
 		decision := data.(string)
 		if decision == "Y" {
+			patientDetails, err := utils.ParsePatientDetails(currentUserState.PendingMessage)
+			if err != nil {
+				uc.SendMessage(phoneNumber, "Error: The submitted data was malformed. Please try again.")
+
+				formFormat := "Please send patient details in the format:\nDoctor Name: [Name]\nPatient Name: [Name]\nPatient Birth Date: [Date]\nMedication: [Drug]\nPatient Phone Number: [Number using 62]"
+				uc.SendMessage(phoneNumber, formFormat)
+				currentUserState.State = StateAwaitingFormSubmission
+				return err
+			}
+
+			log.Printf(
+				"Parsed Request: Doctor=%s, Patient=%s, Meds=%s, Phone=%s, DOB=%s",
+				patientDetails.DoctorName,
+				patientDetails.PatientName,
+				patientDetails.Medication,
+				patientDetails.PatientPhoneNumber,
+				patientDetails.PatientBirthDate,
+			)
+
 			// **SEND TO PHARMACY LOGIC HERE**
 			pharmacyNumber := config.LoadConfig().PharmacyNumber
 			// Send the pending message to the pharmacy number
-			msgToPharmacy := fmt.Sprintf("New prescription request:\n\n%s", currentUserState.PendingMessage)
-			err := uc.SendMessage(pharmacyNumber, msgToPharmacy)
+			msgToPharmacy := fmt.Sprintf("New prescription request that need:\n%s \n\nWith Queue Number: %d\n\nThis Medicine for:\n%s\n%s\n%s\n\nFrom:\nDoctor %s", patientDetails.Medication, Queue, patientDetails.PatientName, patientDetails.PatientBirthDate, patientDetails.PatientPhoneNumber, patientDetails.DoctorName)
+			err = uc.SendMessage(pharmacyNumber, msgToPharmacy)
 			if err != nil {
 				uc.SendMessage(phoneNumber, "Failed to send the request to the pharmacy. Please try again later.")
 				return err
-			}			
+			}
+			msgToPatient := fmt.Sprintf("Your prescription request for %s has been sent to the pharmacy. Your Number Queue is %d. Please wait for further updates from the pharmacy.", patientDetails.Medication, Queue)
+			
+			if DateNow != time.Now().Format("2006-01-02") {
+				Queue = 1
+				DateNow = time.Now().Format("2006-01-02")
+			} else {
+				Queue += 1
+			}
+
 			uc.SendMessage(phoneNumber, "Your request was sent to the pharmacy. Session complete.")
-			// uc.CloseChat(phoneNumber)
+			uc.SendMessage(patientDetails.PatientPhoneNumber, msgToPatient)
 			utils.ResetUserState(phoneNumber) // <-- Reset State
 		} else if decision == "N" {
-			formFormat := "Request cancelled. Please submit the form again with the correct details:\n`Patient Name: [Name], Medication: [Drug], Dosage: [Dosage]`"
+			formFormat := "Request cancelled. Please submit the form again with the correct details:\nDoctor Name: [Name]\nPatient Name: [Name]\nPatient Birth Date: [Date]\nMedication: [Drug]\nPatient Phone Number: [Number using 62]"
 			uc.SendMessage(phoneNumber, formFormat)
 			currentUserState.State = StateAwaitingFormSubmission // <-- State Transition
 		}
