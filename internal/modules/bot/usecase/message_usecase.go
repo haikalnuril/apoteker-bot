@@ -7,13 +7,12 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"regexp"
+	// "regexp"
 	"strings"
 	"telegram-doctor-recipe-helper-bot/internal/app/config"
 	"telegram-doctor-recipe-helper-bot/internal/app/exception"
-	"telegram-doctor-recipe-helper-bot/internal/app/model"
+	// "telegram-doctor-recipe-helper-bot/internal/app/model"
 	"telegram-doctor-recipe-helper-bot/internal/app/utils"
-	"telegram-doctor-recipe-helper-bot/internal/modules/bot/repository"
 	"time"
 )
 
@@ -23,7 +22,7 @@ type MessageUseCase interface {
 }
 
 type messageUseCase struct {
-	repo repository.MessageRepository
+	sheetService *utils.SheetService
 }
 
 // --- Define the conversation states as constants for safety ---
@@ -34,9 +33,9 @@ const (
 	StateAwaitingConfirmation   = "AWAITING_CONFIRMATION"
 )
 
-func NewMessageUseCase(repo repository.MessageRepository) MessageUseCase {
+func NewMessageUseCase(sheetService *utils.SheetService) MessageUseCase {
 	return &messageUseCase{
-		repo: repo,
+		sheetService: sheetService,
 	}
 }
 
@@ -147,6 +146,13 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 				patientDetails.PatientBirthDate,
 			)
 
+			err = uc.sheetService.AddPrescriptionRow(patientDetails, Queue)
+			if err != nil {
+				// If it fails, tell the doctor but maybe still send to pharmacy
+				uc.SendMessage(phoneNumber, "Note: Failed to save the record to the spreadsheet, but will still attempt to send to pharmacy.")
+				// You can decide if you want to stop here or continue
+			}
+
 			// **SEND TO PHARMACY LOGIC HERE**
 			pharmacyNumber := config.LoadConfig().PharmacyNumber
 			// Send the pending message to the pharmacy number
@@ -157,7 +163,7 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 				return err
 			}
 			msgToPatient := fmt.Sprintf("Your prescription request for %s has been sent to the pharmacy. Your Number Queue is %d. Please wait for further updates from the pharmacy.", patientDetails.Medication, Queue)
-			
+
 			if DateNow != time.Now().Format("2006-01-02") {
 				Queue = 1
 				DateNow = time.Now().Format("2006-01-02")
@@ -179,30 +185,30 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 }
 
 // Parse message with pattern: name:..., order:..., phone number:...
-func (uc *messageUseCase) parseOrderMessage(message string) (*model.OrderData, error) {
-	// Convert to lowercase for easier parsing
-	lowerMsg := strings.ToLower(message)
+// func (uc *messageUseCase) parseOrderMessage(message string) (*model.OrderData, error) {
+// 	// Convert to lowercase for easier parsing
+// 	lowerMsg := strings.ToLower(message)
 
-	// Regex patterns (more flexible)
-	namePattern := regexp.MustCompile(`name\s*:\s*([^,\n]+)`)
-	orderPattern := regexp.MustCompile(`order\s*:\s*([^,\n]+)`)
-	phonePattern := regexp.MustCompile(`phone\s*(?:number)?\s*:\s*([^,\s\n]+)`)
+// 	// Regex patterns (more flexible)
+// 	namePattern := regexp.MustCompile(`name\s*:\s*([^,\n]+)`)
+// 	orderPattern := regexp.MustCompile(`order\s*:\s*([^,\n]+)`)
+// 	phonePattern := regexp.MustCompile(`phone\s*(?:number)?\s*:\s*([^,\s\n]+)`)
 
-	nameMatch := namePattern.FindStringSubmatch(lowerMsg)
-	orderMatch := orderPattern.FindStringSubmatch(lowerMsg)
-	phoneMatch := phonePattern.FindStringSubmatch(lowerMsg)
+// 	nameMatch := namePattern.FindStringSubmatch(lowerMsg)
+// 	orderMatch := orderPattern.FindStringSubmatch(lowerMsg)
+// 	phoneMatch := phonePattern.FindStringSubmatch(lowerMsg)
 
-	if nameMatch == nil || orderMatch == nil || phoneMatch == nil {
-		return nil, &exception.BadRequestError{Message: "Invalid message format"}
-	}
+// 	if nameMatch == nil || orderMatch == nil || phoneMatch == nil {
+// 		return nil, &exception.BadRequestError{Message: "Invalid message format"}
+// 	}
 
-	return &model.OrderData{
-		Name:        strings.TrimSpace(nameMatch[1]),
-		Recipe:      strings.TrimSpace(orderMatch[1]),
-		PhoneNumber: strings.TrimSpace(phoneMatch[1]),
-		Timestamp:   time.Now().Format("2006-01-02 15:04:05"),
-	}, nil
-}
+// 	return &model.OrderData{
+// 		Name:        strings.TrimSpace(nameMatch[1]),
+// 		Recipe:      strings.TrimSpace(orderMatch[1]),
+// 		PhoneNumber: strings.TrimSpace(phoneMatch[1]),
+// 		Timestamp:   time.Now().Format("2006-01-02 15:04:05"),
+// 	}, nil
+// }
 
 // SendMessage sends a WhatsApp message via the API
 func (uc *messageUseCase) SendMessage(phoneNumber, message string) error {
