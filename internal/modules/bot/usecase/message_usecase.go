@@ -184,32 +184,6 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 	return nil
 }
 
-// Parse message with pattern: name:..., order:..., phone number:...
-// func (uc *messageUseCase) parseOrderMessage(message string) (*model.OrderData, error) {
-// 	// Convert to lowercase for easier parsing
-// 	lowerMsg := strings.ToLower(message)
-
-// 	// Regex patterns (more flexible)
-// 	namePattern := regexp.MustCompile(`name\s*:\s*([^,\n]+)`)
-// 	orderPattern := regexp.MustCompile(`order\s*:\s*([^,\n]+)`)
-// 	phonePattern := regexp.MustCompile(`phone\s*(?:number)?\s*:\s*([^,\s\n]+)`)
-
-// 	nameMatch := namePattern.FindStringSubmatch(lowerMsg)
-// 	orderMatch := orderPattern.FindStringSubmatch(lowerMsg)
-// 	phoneMatch := phonePattern.FindStringSubmatch(lowerMsg)
-
-// 	if nameMatch == nil || orderMatch == nil || phoneMatch == nil {
-// 		return nil, &exception.BadRequestError{Message: "Invalid message format"}
-// 	}
-
-// 	return &model.OrderData{
-// 		Name:        strings.TrimSpace(nameMatch[1]),
-// 		Recipe:      strings.TrimSpace(orderMatch[1]),
-// 		PhoneNumber: strings.TrimSpace(phoneMatch[1]),
-// 		Timestamp:   time.Now().Format("2006-01-02 15:04:05"),
-// 	}, nil
-// }
-
 // SendMessage sends a WhatsApp message via the API
 func (uc *messageUseCase) SendMessage(phoneNumber, message string) error {
 	cfg := config.LoadConfig()
