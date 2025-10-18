@@ -53,31 +53,6 @@ func (ctrl *BotController) HandleWebhook(c *fiber.Ctx) error {
 }
 
 // Manual send message
-func (ctrl *BotController) SendMessage(c *fiber.Ctx) error {
-	var req struct {
-		PhoneNumber string `json:"phone_number"`
-		Message     string `json:"message"`
-	}
-
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(model.Response{
-			Code:    400,
-			Message: "Invalid request body",
-		})
-	}
-
-	if err := ctrl.useCase.SendMessage(req.PhoneNumber, req.Message); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(model.Response{
-			Code:    500,
-			Message: err.Error(),
-		})
-	}
-
-	return c.JSON(model.Response{
-		Code:    200,
-		Message: "Message sent successfully",
-	})
-}
 
 // Health check
 func (ctrl *BotController) HealthCheck(c *fiber.Ctx) error {
