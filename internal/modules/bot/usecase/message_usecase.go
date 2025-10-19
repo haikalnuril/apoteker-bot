@@ -69,7 +69,7 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 	if strings.TrimSpace(messageText) == "" {
 		return nil
 	}
-	if phoneNumber != config.LoadConfig().AllowedNumber {
+	if phoneNumber != config.LoadConfig().AllowedNumber && phoneNumber != config.LoadConfig().NewDoctor {
 		return nil
 	}
 

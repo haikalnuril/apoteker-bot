@@ -18,6 +18,7 @@ type Config struct {
 	SheetLink       string
 	PharmacyNumber  string
 	SheetID         string
+	NewDoctor       string
 }
 
 func LoadConfig() *Config {
@@ -37,6 +38,7 @@ func LoadConfig() *Config {
 		SheetLink:       c.Get("SHEET_LINK", ""),
 		PharmacyNumber:  c.Get("PHARMACY_NUMBER", "089123456789"),
 		SheetID:         c.Get("SHEET_ID", ""),
+		NewDoctor:       c.Get("NEW_DOCTOR", "089123456789"),
 	}
 }
 

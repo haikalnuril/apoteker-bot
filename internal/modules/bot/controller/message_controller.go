@@ -30,7 +30,7 @@ func (ctrl *BotController) HandleWebhook(c *fiber.Ctx) error {
 	}
 
 	// Check if from allowed number BEFORE processing
-	if payload.SenderID != config.LoadConfig().AllowedNumber {
+	if payload.SenderID != config.LoadConfig().AllowedNumber && payload.SenderID != config.LoadConfig().NewDoctor {
 		return c.JSON(model.Response{
 			Code:    200,
 			Message: "Message ignored - unauthorized sender",
