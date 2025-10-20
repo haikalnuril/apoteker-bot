@@ -1,12 +1,18 @@
+version: "3.8"
+
 services:
-    whatsapp:
+    # Service 1: "Mesin" GOWA untuk koneksi ke WhatsApp
+    gowa-engine:
         image: aldinokemal2104/go-whatsapp-web-multidevice
-        container_name: whatsapp
-        restart: always
+        container_name: gowa-engine
+        restart: unless-stopped
         ports:
             - "${GOWA_PORT}:${GOWA_PORT}"
+        expose:
+            - "${GOWA_PORT}"
         volumes:
-            - D:\HAIKAL NURIL\Project\apoteker-bot:/storages
+            # Volume untuk menyimpan sesi login WhatsApp
+            - ./storages:/storages
         environment:
             - APP_BASIC_AUTH=${GOWA_USERNAME}:${GOWA_PASSWORD}
             - APP_PORT=${GOWA_PORT}
@@ -14,6 +20,54 @@ services:
             - APP_OS=Chrome
             - WHATSAPP_AUTO_MARK_READ=true
             - WHATSAPP_WEBHOOK=${WHATSAPP_WEBHOOK_URL}
-            - WHATSAPP_WEBHOOK_SECRET=super-secret-key
+            - WHATSAPP_WEBHOOK_SECRET=${WHATSAPP_WEBHOOK_SECRET}
             - WHATSAPP_ACCOUNT_VALIDATION=true
             - WHATSAPP_CHAT_STORAGE=true
+
+    # Service 2: "Otak" atau logika bot kustom Anda
+    apoteker-bot:
+        # Service ini dibangun dari kode Go Anda
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: apoteker-bot:latest
+        container_name: apoteker-bot
+        restart: unless-stopped
+        expose:
+            - "${APP_PORT}" # Port 8080
+        volumes:
+            # Mount file .env dan credentials agar bisa dibaca oleh aplikasi Go Anda
+            - ./.env:/app/.env
+            - ./bot-credentials.json:/app/bot-credentials.json
+        environment:
+            - WHATSAPP_WEBHOOK_URL=${WHATSAPP_WEBHOOK_URL}
+            - WHATSAPP_WEBHOOK_SECRET=${WHATSAPP_WEBHOOK_SECRET}
+            - GOWA_USERNAME=${GOWA_USERNAME}
+            - GOWA_PASSWORD=${GOWA_PASSWORD}
+            - GOWA_PORT=${GOWA_PORT}
+            - APP_PORT=${APP_PORT}
+            - WHATSAPP_API_URL=${WHATSAPP_API_URL}
+            - ALLOWED_NUMBER=${ALLOWED_NUMBER}
+            - NEW_DOCTOR=${NEW_DOCTOR}
+            - SHEET_LINK=${SHEET_LINK}
+            - PHARMACY_NUMBER=${PHARMACY_NUMBER}
+            - SHEET_ID=${SHEET_ID}
+
+    # Service 3: Caddy sebagai Pintu Gerbang (Router)
+    caddy:
+        image: caddy:2
+        container_name: caddy
+        restart: unless-stopped
+        ports:
+            - "80:80"
+            - "443:443"
+            - "443:443/udp"
+        volumes:
+            # Gunakan Caddyfile.local untuk pengujian di laptop
+            - ./Caddyfile.local:/etc/caddy/Caddyfile
+            - caddy_data:/data
+            - caddy_config:/config
+
+volumes:
+    caddy_data:
+    caddy_config:

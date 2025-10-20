@@ -188,6 +188,8 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 func (uc *messageUseCase) SendMessage(phoneNumber, message string) error {
 	cfg := config.LoadConfig()
 	url := fmt.Sprintf("%s/send/message", cfg.WhatsAppAPIURL)
+	gowaUsername := cfg.GowaAdmin
+	gowaPassword := cfg.GowaPassword
 
 	// Prepare the request payload
 	payload := map[string]interface{}{
@@ -211,7 +213,7 @@ func (uc *messageUseCase) SendMessage(phoneNumber, message string) error {
 	req.Header.Set("Content-Type", "application/json")
 
 	// Add Basic Auth (username: admin, password: admin)
-	req.SetBasicAuth("admin", "admin")
+	req.SetBasicAuth(gowaUsername, gowaPassword)
 
 	// Send request
 	client := &http.Client{}

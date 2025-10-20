@@ -1,0 +1,13 @@
+# File: Caddyfile.local
+
+# Subdomain ini akan mengarah ke UI GOWA untuk Scan QR
+http://gowa.localhost {
+    # ✅ Arahkan ke service 'gowa-engine' di port 3000
+    reverse_proxy gowa-engine:3000
+}
+
+# Domain utama akan mengarah ke logika bot Anda
+http://localhost {
+    # ✅ Arahkan ke service 'apoteker-bot' di port 8080
+    reverse_proxy apoteker-bot:8080
+}
