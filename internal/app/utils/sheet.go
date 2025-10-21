@@ -35,6 +35,11 @@ func (s *SheetService) AddPrescriptionRow(details *PatientDetails, Queue int) er
 
 	var row []interface{}
 
+	wibTime := time.Now().UTC().Add(7 * time.Hour)
+
+	// Format: "02 January 2006 15:04 WIB"
+	formattedTime := wibTime.Format("02 January 2006 15:04") + " WIB"
+
 	row = append(row,
 		Queue,
 		details.DoctorName,
@@ -42,7 +47,7 @@ func (s *SheetService) AddPrescriptionRow(details *PatientDetails, Queue int) er
 		details.PatientBirthDate,
 		details.Medication,
 		details.PatientPhoneNumber,
-		time.Now().Format(time.RFC3339),
+		formattedTime,
 	)
 
 	// 3. Create the data structure the API needs
