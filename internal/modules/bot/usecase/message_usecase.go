@@ -96,7 +96,7 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 	case StateAwaitingMenuChoice:
 		choice := data.(string)
 		if choice == "1" {
-			formFormat := "Please send patient details in the format:\nDoctor Name: [Name]\nPatient Name: [Name]\nPatient Birth Date: [Date]\nMedication: [Drug]\nPatient Phone Number: [Number using 62]"
+			formFormat := "Please send patient details in the format:\nDoctor Name: [Name]\nPatient Name: [Name]\nPatient Birth Date: [Date]\nRegistry Number: [Number]\nMedication: [Drug]\nPatient Phone Number: [Number using 62]\nPayment Method: [Method]"
 			uc.SendMessage(phoneNumber, formFormat)
 			currentUserState.State = StateAwaitingFormSubmission // <-- State Transition
 		} else if choice == "2" {
@@ -131,7 +131,7 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 			if err != nil {
 				uc.SendMessage(phoneNumber, "Error: The submitted data was malformed. Please try again.")
 
-				formFormat := "Please send patient details in the format:\nDoctor Name: [Name]\nPatient Name: [Name]\nPatient Birth Date: [Date]\nMedication: [Drug]\nPatient Phone Number: [Number using 62]"
+				formFormat := "Please send patient details in the format:\nDoctor Name: [Name]\nPatient Name: [Name]\nPatient Birth Date: [Date]\nRegistry Number: [Number]\nMedication: [Drug]\nPatient Phone Number: [Number using 62]\nPayment Method: [Method]"
 				uc.SendMessage(phoneNumber, formFormat)
 				currentUserState.State = StateAwaitingFormSubmission
 				return err
@@ -162,7 +162,7 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 				uc.SendMessage(phoneNumber, "Failed to send the request to the pharmacy. Please try again later.")
 				return err
 			}
-			msgToPatient := fmt.Sprintf("Your prescription request for %s has been sent to the pharmacy. Your Number Queue is %d. Please wait for further updates from the pharmacy.", patientDetails.Medication, Queue)
+			msgToPatient := fmt.Sprintf("Hi %s, Your prescription request for %s has been sent to the pharmacy. Your Number Queue is %d. Please wait for further updates from the pharmacy.", patientDetails.PatientName, patientDetails.Medication, Queue)
 
 			if DateNow != time.Now().Format("2006-01-02") {
 				Queue = 1
@@ -175,7 +175,7 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 			uc.SendMessage(patientDetails.PatientPhoneNumber, msgToPatient)
 			utils.ResetUserState(phoneNumber) // <-- Reset State
 		} else if decision == "N" {
-			formFormat := "Request cancelled. Please submit the form again with the correct details:\nDoctor Name: [Name]\nPatient Name: [Name]\nPatient Birth Date: [Date]\nMedication: [Drug]\nPatient Phone Number: [Number using 62]"
+			formFormat := "Request cancelled. Please submit the form again with the correct details:\nDoctor Name: [Name]\nPatient Name: [Name]\nPatient Birth Date: [Date]\nRegistry Number: [Number]\nMedication: [Drug]\nPatient Phone Number: [Number using 62]\nPayment Method: [Method]"
 			uc.SendMessage(phoneNumber, formFormat)
 			currentUserState.State = StateAwaitingFormSubmission // <-- State Transition
 		}

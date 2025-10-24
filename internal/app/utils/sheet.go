@@ -45,8 +45,10 @@ func (s *SheetService) AddPrescriptionRow(details *PatientDetails, Queue int) er
 		details.DoctorName,
 		details.PatientName,
 		details.PatientBirthDate,
+		details.RegistryNum,
 		details.Medication,
 		details.PatientPhoneNumber,
+		details.PaymentMethod,
 		formattedTime,
 	)
 

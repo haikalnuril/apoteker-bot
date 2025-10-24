@@ -10,8 +10,10 @@ type PatientDetails struct {
 	DoctorName         string
 	PatientName        string
 	PatientBirthDate   string
+	RegistryNum        string
 	Medication         string
 	PatientPhoneNumber string
+	PaymentMethod      string
 }
 
 func ParsePatientDetails(message string) (*PatientDetails, error) {
@@ -35,17 +37,25 @@ func ParsePatientDetails(message string) (*PatientDetails, error) {
 	details.DoctorName = parsedFields["Doctor Name"]
 	details.PatientName = parsedFields["Patient Name"]
 	details.PatientBirthDate = parsedFields["Patient Birth Date"]
+
+	rawRegistryNum := parsedFields["Registry Number"]
+	details.RegistryNum = normalizeRegistryNum(rawRegistryNum)
+
 	details.Medication = parsedFields["Medication"]
 
 	// Normalize phone number before assigning
 	rawPhone := parsedFields["Patient Phone Number"]
 	details.PatientPhoneNumber = normalizePhone(rawPhone)
 
+	details.PaymentMethod = parsedFields["Payment Method"]
+
 	if details.DoctorName == "" ||
 		details.PatientName == "" ||
 		details.PatientBirthDate == "" ||
+		details.RegistryNum == "" ||
 		details.Medication == "" ||
-		details.PatientPhoneNumber == "" {
+		details.PatientPhoneNumber == "" ||
+		details.PaymentMethod == "" {
 		return nil, &exception.BadRequestError{Message: "Missing required fields in the message"}
 	}
 
@@ -73,4 +83,19 @@ func normalizePhone(input string) string {
 	}
 
 	return phone
+}
+
+func normalizeRegistryNum(input string) string {
+	if input == "" {
+		return ""
+	}
+
+	// Check if the string starts with "0"
+	if strings.HasPrefix(input, "0") {
+		// If it does, add a single quote ' in front
+		return "'" + input
+	}
+
+	// Otherwise, return the original string
+	return input
 }
