@@ -171,8 +171,10 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 				Queue += 1
 			}
 
-			uc.SendMessage(phoneNumber, "Your request was sent to the pharmacy. Session complete.")
-			uc.SendMessage(patientDetails.PatientPhoneNumber, msgToPatient)
+			if patientDetails.PatientPhoneNumber != "-" {
+				uc.SendMessage(phoneNumber, "Your request was sent to the pharmacy. Session complete.")
+				uc.SendMessage(patientDetails.PatientPhoneNumber, msgToPatient)
+			}
 			utils.ResetUserState(phoneNumber) // <-- Reset State
 		} else if decision == "N" {
 			formFormat := "Request cancelled. Please submit the form again with the correct details:\nDoctor Name: [Name]\nPatient Name: [Name]\nPatient Birth Date: [Date]\nRegistry Number: [Number]\nMedication: [Drug]\nPatient Phone Number: [Number using 62]\nPayment Method: [Method]"

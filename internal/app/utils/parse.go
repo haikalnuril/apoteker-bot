@@ -65,7 +65,7 @@ func ParsePatientDetails(message string) (*PatientDetails, error) {
 // normalizePhone cleans and converts phone number to Indonesian standard format: 628xxxxxxxxxx
 func normalizePhone(input string) string {
 	if input == "" {
-		return ""
+		return "-"
 	}
 
 	// Remove all non-digit characters
