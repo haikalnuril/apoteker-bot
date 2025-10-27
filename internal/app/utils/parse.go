@@ -34,20 +34,20 @@ func ParsePatientDetails(message string) (*PatientDetails, error) {
 		parsedFields[key] = value
 	}
 
-	details.DoctorName = parsedFields["Doctor Name"]
-	details.PatientName = parsedFields["Patient Name"]
-	details.PatientBirthDate = parsedFields["Patient Birth Date"]
+	details.DoctorName = parsedFields["Nama Dokter"]
+	details.PatientName = parsedFields["Nama Pasien"]
+	details.PatientBirthDate = parsedFields["Tanggal Lahir Pasien"]
 
-	rawRegistryNum := parsedFields["Registry Number"]
+	rawRegistryNum := parsedFields["No Regis"]
 	details.RegistryNum = normalizeRegistryNum(rawRegistryNum)
 
-	details.Medication = parsedFields["Medication"]
+	details.Medication = parsedFields["Resep Obat"]
 
 	// Normalize phone number before assigning
-	rawPhone := parsedFields["Patient Phone Number"]
+	rawPhone := parsedFields["Nomor Telpon Pasien"]
 	details.PatientPhoneNumber = normalizePhone(rawPhone)
 
-	details.PaymentMethod = parsedFields["Payment Method"]
+	details.PaymentMethod = parsedFields["Pembiayaan"]
 
 	if details.DoctorName == "" ||
 		details.PatientName == "" ||
@@ -64,7 +64,7 @@ func ParsePatientDetails(message string) (*PatientDetails, error) {
 
 // normalizePhone cleans and converts phone number to Indonesian standard format: 628xxxxxxxxxx
 func normalizePhone(input string) string {
-	if input == "" {
+	if input == "" || input == "-" {
 		return "-"
 	}
 

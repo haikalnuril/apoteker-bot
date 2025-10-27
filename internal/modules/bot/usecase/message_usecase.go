@@ -7,10 +7,12 @@ import (
 	"io"
 	"log"
 	"net/http"
+
 	// "regexp"
 	"strings"
 	"telegram-doctor-recipe-helper-bot/internal/app/config"
 	"telegram-doctor-recipe-helper-bot/internal/app/exception"
+
 	// "telegram-doctor-recipe-helper-bot/internal/app/model"
 	"telegram-doctor-recipe-helper-bot/internal/app/utils"
 	"time"
@@ -89,38 +91,38 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 	switch currentUserState.State {
 	case StateAwaitingStart:
 		// User sent /start
-		welcomeMessage := "hello, this is doctor to pharmacy bot.\n[1] Send message to pharmacy\n[2] Get Spreadsheet link\n[3] Cancel\n\nAnswer with number only!"
+		welcomeMessage := "halo, ini adalah bot penghubung antara dokter dan apoteker.\n[1] Kirim pesan ke apoteker\n[2] Membuka Link Spreadsheet\n[3] Cancel\n\nJawab dengan angka saja!"
 		uc.SendMessage(phoneNumber, welcomeMessage)
 		currentUserState.State = StateAwaitingMenuChoice // <-- State Transition
 
 	case StateAwaitingMenuChoice:
 		choice := data.(string)
 		if choice == "1" {
-			formFormat := "Please send patient details in the format:\nDoctor Name: [Name]\nPatient Name: [Name]\nPatient Birth Date: [Date]\nRegistry Number: [Number]\nMedication: [Drug]\nPatient Phone Number: [Number using 62]\nPayment Method: [Method]"
+			formFormat := "Mohon kirim data pasien dengan detail format berikut:\nNama Dokter: \nNama Pasien: \nTanggal Lahir Pasien: \nNo Regis: \nResep Obat: \nNomor Telpon Pasien: \nPembiayaan: "
 			uc.SendMessage(phoneNumber, formFormat)
 			currentUserState.State = StateAwaitingFormSubmission // <-- State Transition
 		} else if choice == "2" {
-			message := fmt.Sprintf("Here is the spreadsheet link: %s", config.LoadConfig().SheetLink)
+			message := fmt.Sprintf("Berikut adalah link spreadsheet: %s", config.LoadConfig().SheetLink)
 			uc.SendMessage(phoneNumber, message)
-			uc.SendMessage(phoneNumber, "Session complete.")
+			uc.SendMessage(phoneNumber, "Sesi selesai.")
 			// uc.CloseChat(phoneNumber) // Assuming you have a close function
 			utils.ResetUserState(phoneNumber) // <-- Reset State
 		} else if choice == "3" {
-			uc.SendMessage(phoneNumber, "Session cancelled. To start again, send `/start`.")
+			uc.SendMessage(phoneNumber, "Sesi dibatalkan. Untuk memulai kembali, kirim `/start`.")
 			// uc.CloseChat(phoneNumber) // Assuming you have a close function
 			utils.ResetUserState(phoneNumber) // <-- Reset State
 		}
 
 	case StateAwaitingFormSubmission:
 		if cmd, ok := data.(string); ok && cmd == "cancel" {
-			welcomeMessage := "[1] Send message to pharmacy\n[2] Get Spreadsheet link\n[3] Cancel\n\nAnswer with number only!"
-			uc.SendMessage(phoneNumber, "Request cancelled. Returning to the main menu.\n\n"+welcomeMessage)
+			welcomeMessage := "[1] Kirim pesan ke apoteker\n[2] Membuka Link Spreadsheet\n[3] Cancel\n\nJawab dengan angka saja!"
+			uc.SendMessage(phoneNumber, "Permintaan dibatalkan. Kembali ke halaman utama.\n\n"+welcomeMessage)
 			currentUserState.State = StateAwaitingMenuChoice // <-- State Transition
 			return nil
 		}
 		// Store the original message text for confirmation
 		currentUserState.PendingMessage = messageText
-		confirmationPrompt := fmt.Sprintf("Please confirm the following request is correct:\n\n%s\n\nIs this correct? (Y/N)", messageText)
+		confirmationPrompt := fmt.Sprintf("Mohon konfirmasi permintaan anda:\n\n%s\n\nApakah sudah benar? (Y/N)", messageText)
 		uc.SendMessage(phoneNumber, confirmationPrompt)
 		currentUserState.State = StateAwaitingConfirmation // <-- State Transition
 
@@ -129,9 +131,9 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 		if decision == "Y" {
 			patientDetails, err := utils.ParsePatientDetails(currentUserState.PendingMessage)
 			if err != nil {
-				uc.SendMessage(phoneNumber, "Error: The submitted data was malformed. Please try again.")
+				uc.SendMessage(phoneNumber, "Error: Data yang dikirim terdapat kesalahan format. Mohon untuk mencoba kembali.")
 
-				formFormat := "Please send patient details in the format:\nDoctor Name: [Name]\nPatient Name: [Name]\nPatient Birth Date: [Date]\nRegistry Number: [Number]\nMedication: [Drug]\nPatient Phone Number: [Number using 62]\nPayment Method: [Method]"
+				formFormat := "Mohon kirim data pasien dengan detail format berikut:\nNama Dokter: \nNama Pasien: \nTanggal Lahir Pasien: \nNo Regis: \nResep Obat: \nNomor Telpon Pasien: \nPembiayaan: "
 				uc.SendMessage(phoneNumber, formFormat)
 				currentUserState.State = StateAwaitingFormSubmission
 				return err
@@ -149,20 +151,20 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 			err = uc.sheetService.AddPrescriptionRow(patientDetails, Queue)
 			if err != nil {
 				// If it fails, tell the doctor but maybe still send to pharmacy
-				uc.SendMessage(phoneNumber, "Note: Failed to save the record to the spreadsheet, but will still attempt to send to pharmacy.")
+				uc.SendMessage(phoneNumber, "Note: Gagal untuk menyimpan ke spreadsheet, tetapi tetap akan dikirim ke apoteker.")
 				// You can decide if you want to stop here or continue
 			}
 
 			// **SEND TO PHARMACY LOGIC HERE**
 			pharmacyNumber := config.LoadConfig().PharmacyNumber
 			// Send the pending message to the pharmacy number
-			msgToPharmacy := fmt.Sprintf("New prescription request that need:\n%s \n\nWith Queue Number: %d\n\nThis Medicine for:\n%s\n%s\n%s\n\nFrom:\nDoctor %s", patientDetails.Medication, Queue, patientDetails.PatientName, patientDetails.PatientBirthDate, patientDetails.PatientPhoneNumber, patientDetails.DoctorName)
+			msgToPharmacy := fmt.Sprintf("Permintaan resep obat baru:\n%s \n\nDengan nomor Antrian: %d\n\nObat ini untuk:\n%s\n%s\n%s\n\nDari:\nDokter %s", patientDetails.Medication, Queue, patientDetails.PatientName, patientDetails.PatientBirthDate, patientDetails.PatientPhoneNumber, patientDetails.DoctorName)
 			err = uc.SendMessage(pharmacyNumber, msgToPharmacy)
 			if err != nil {
-				uc.SendMessage(phoneNumber, "Failed to send the request to the pharmacy. Please try again later.")
+				uc.SendMessage(phoneNumber, "Gagal mengirim pesan ke apoteker. Mohon coba kembali lagi nanti.")
 				return err
 			}
-			msgToPatient := fmt.Sprintf("Hi %s, Your prescription request for %s has been sent to the pharmacy. Your Number Queue is %d. Please wait for further updates from the pharmacy.", patientDetails.PatientName, patientDetails.Medication, Queue)
+			msgToPatient := fmt.Sprintf("Halo %s, permintaan resepmu:\n\n %s \n\nsudah dikirim ke apoteker. Antrian kamu adalah %d. Mohon ditunggu informasi selanjutnya dari apoteker.", patientDetails.PatientName, patientDetails.Medication, Queue)
 
 			if DateNow != time.Now().Format("2006-01-02") {
 				Queue = 1
@@ -172,12 +174,12 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 			}
 
 			if patientDetails.PatientPhoneNumber != "-" {
-				uc.SendMessage(phoneNumber, "Your request was sent to the pharmacy. Session complete.")
 				uc.SendMessage(patientDetails.PatientPhoneNumber, msgToPatient)
 			}
+			uc.SendMessage(phoneNumber, "Permintaan kamu sudah dikirimkan kebagian apoteker. Sesi Selesai.")
 			utils.ResetUserState(phoneNumber) // <-- Reset State
 		} else if decision == "N" {
-			formFormat := "Request cancelled. Please submit the form again with the correct details:\nDoctor Name: [Name]\nPatient Name: [Name]\nPatient Birth Date: [Date]\nRegistry Number: [Number]\nMedication: [Drug]\nPatient Phone Number: [Number using 62]\nPayment Method: [Method]"
+			formFormat := "Permintaan dibatalkan. Mohon kirim ulang dengan detail form yang benar:\nNama Dokter: \nNama Pasien: \nTanggal Lahir Pasien: \nNo Regis: \nResep Obat: \nNomor Telpon Pasien: \nPembiayaan: "
 			uc.SendMessage(phoneNumber, formFormat)
 			currentUserState.State = StateAwaitingFormSubmission // <-- State Transition
 		}

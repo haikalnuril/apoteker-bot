@@ -18,7 +18,7 @@ type ExtractedFormData struct {
 
 // The CORRECT pre-compiled regex for validating the multi-line format.
 // We use the (?s) flag to allow '.' to match newlines.
-var formRegex = regexp.MustCompile(`(?is)Doctor Name:\s*(.*?)\s*Patient Name:\s*(.*?)\s*Patient Birth Date:\s*(.*?)\s*Registry Number:\s*(.*?)\s*Medication:\s*(.*?)\s*Patient Phone Number:\s*(.*)\s*Payment Method:\s*(.*?)`)
+var formRegex = regexp.MustCompile(`(?is)Nama Dokter:\s*(.*?)\s*Nama Pasien:\s*(.*?)\s*Tanggal Lahir Pasien:\s*(.*?)\s*No Regis:\s*(.*?)\s*Resep Obat:\s*(.*?)\s*Nomor Telpon Pasien:\s*(.*)\s*Pembiayaan:\s*(.*?)`)
 
 // validateMessageForState checks if a message is valid for the given state.
 // It returns: (isValid bool, extractedData interface{}, errorMessage string)
@@ -28,13 +28,13 @@ func ValidateMessageForState(state string, message string) (bool, interface{}, s
 		if strings.ToLower(message) == "/start" {
 			return true, nil, ""
 		}
-		return false, nil, "To start a new session, please send `/start`."
+		return false, nil, "Untuk memulai sesi baru, kirim pesan `/start`."
 
 	case StateAwaitingMenuChoice:
 		if message == "1" || message == "2" || message == "3" {
 			return true, message, ""
 		}
-		return false, nil, "Invalid input. Please reply with `1`, `2`, or `3`."
+		return false, nil, "Inputan salah. Mohon reply dengan `1`, `2`, atau `3`."
 
 	case StateAwaitingFormSubmission:
 		if strings.ToLower(message) == "cancel" {
@@ -54,7 +54,7 @@ func ValidateMessageForState(state string, message string) (bool, interface{}, s
 			}
 			return true, data, ""
 		}
-		return false, nil, "The format appears incorrect. Please follow the required format or send `cancel` to go back to the main menu."
+		return false, nil, "Format yang dikirimkan salah. Mohon ikuti syarat format atau kirim pesan `cancel` untuk kembali ke main menu."
 
 	case StateAwaitingConfirmation:
 		cleanMsg := strings.ToUpper(message)
@@ -64,9 +64,9 @@ func ValidateMessageForState(state string, message string) (bool, interface{}, s
 		if cleanMsg == "N" || cleanMsg == "NO" {
 			return true, "N", ""
 		}
-		return false, nil, "Invalid response. Please reply with 'Y' to confirm or 'N' to edit."
+		return false, nil, "Respon tidak sesuai. Mohon reply dengan 'Y' untuk komfirmasi atau 'N' untuk edit."
 	}
 
 	// Fallback for any unknown state
-	return false, nil, "An unexpected error occurred. Please send /start to begin again."
+	return false, nil, "Terjadi error yang tidak diinginkan. Mohon kirim pesan `/start` untuk memulai kembali."
 }

@@ -31,7 +31,8 @@ func NewSheetService(credentialsFile string, spreadsheetID string) (*SheetServic
 }
 
 func (s *SheetService) AddPrescriptionRow(details *PatientDetails, Queue int) error {
-	writeRange := "Prescriptions"
+	// writeRange := "Prescriptions"
+	writeRange := "Sheet2"
 
 	var row []interface{}
 
