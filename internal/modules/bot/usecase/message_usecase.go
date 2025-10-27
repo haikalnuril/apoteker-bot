@@ -91,7 +91,7 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 	switch currentUserState.State {
 	case StateAwaitingStart:
 		// User sent /start
-		welcomeMessage := "halo, ini adalah bot penghubung antara dokter dan apoteker.\n[1] Kirim pesan ke apoteker\n[2] Membuka Link Spreadsheet\n[3] Cancel\n\nJawab dengan angka saja!"
+		welcomeMessage := "halo, ini adalah bot penghubung antara dokter dan apoteker.\n[1] Buat Resep\n[2] Membuka Link Spreadsheet\n[3] Cancel\n\nJawab dengan angka saja!"
 		uc.SendMessage(phoneNumber, welcomeMessage)
 		currentUserState.State = StateAwaitingMenuChoice // <-- State Transition
 
@@ -115,7 +115,7 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 
 	case StateAwaitingFormSubmission:
 		if cmd, ok := data.(string); ok && cmd == "cancel" {
-			welcomeMessage := "[1] Kirim pesan ke apoteker\n[2] Membuka Link Spreadsheet\n[3] Cancel\n\nJawab dengan angka saja!"
+			welcomeMessage := "[1] Buat Resep\n[2] Membuka Link Spreadsheet\n[3] Cancel\n\nJawab dengan angka saja!"
 			uc.SendMessage(phoneNumber, "Permintaan dibatalkan. Kembali ke halaman utama.\n\n"+welcomeMessage)
 			currentUserState.State = StateAwaitingMenuChoice // <-- State Transition
 			return nil
@@ -154,17 +154,30 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 				uc.SendMessage(phoneNumber, "Note: Gagal untuk menyimpan ke spreadsheet, tetapi tetap akan dikirim ke apoteker.")
 				// You can decide if you want to stop here or continue
 			}
+			originalMeds := patientDetails.Medication
+
+			medParts := strings.Split(originalMeds, ",")
+
+			numberedMedParts := make([]string, len(medParts))
+
+			for i, part := range medParts {
+				trimmedPart := strings.TrimSpace(part)
+				// Format as "1. Item", "2. Item", etc.
+				numberedMedParts[i] = fmt.Sprintf("%d. %s", i+1, trimmedPart)
+			}
+
+			formattedMeds := strings.Join(numberedMedParts, ",\n")
 
 			// **SEND TO PHARMACY LOGIC HERE**
 			pharmacyNumber := config.LoadConfig().PharmacyNumber
 			// Send the pending message to the pharmacy number
-			msgToPharmacy := fmt.Sprintf("Permintaan resep obat baru:\n%s \n\nDengan nomor Antrian: %d\n\nObat ini untuk:\n%s\n%s\n%s\n\nDari:\nDokter %s", patientDetails.Medication, Queue, patientDetails.PatientName, patientDetails.PatientBirthDate, patientDetails.PatientPhoneNumber, patientDetails.DoctorName)
+			msgToPharmacy := fmt.Sprintf("Permintaan resep obat baru:\n\n%s \n\nDengan nomor Antrian: %d\n\nObat ini untuk:\n%s\n%s\n%s\n\nDari:\nDokter %s", formattedMeds, Queue, patientDetails.PatientName, patientDetails.PatientBirthDate, patientDetails.PatientPhoneNumber, patientDetails.DoctorName)
 			err = uc.SendMessage(pharmacyNumber, msgToPharmacy)
 			if err != nil {
 				uc.SendMessage(phoneNumber, "Gagal mengirim pesan ke apoteker. Mohon coba kembali lagi nanti.")
 				return err
 			}
-			msgToPatient := fmt.Sprintf("Halo %s, permintaan resepmu:\n\n %s \n\nsudah dikirim ke apoteker. Antrian kamu adalah %d. Mohon ditunggu informasi selanjutnya dari apoteker.", patientDetails.PatientName, patientDetails.Medication, Queue)
+			msgToPatient := fmt.Sprintf("Halo %s, permintaan resepmu:\n\n%s \n\nsudah dikirim ke apoteker. Antrian kamu adalah %d. Mohon ditunggu informasi selanjutnya dari apoteker.", patientDetails.PatientName, formattedMeds, Queue)
 
 			if DateNow != time.Now().Format("2006-01-02") {
 				Queue = 1
