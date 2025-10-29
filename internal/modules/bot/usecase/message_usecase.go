@@ -194,7 +194,7 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 				uc.SendMessage(phoneNumber, "Gagal mengirim pesan ke apoteker. Mohon coba kembali lagi nanti.")
 				return err
 			}
-			msgToPatient := fmt.Sprintf("Halo %s, permintaan resepmu:\n\n%s \n\nsudah dikirim ke apoteker. Antrian kamu adalah %d. Mohon ditunggu informasi selanjutnya dari apoteker.", patientDetails.PatientName, formattedMeds, currentQueueNumber)
+			msgToPatient := fmt.Sprintf("Halo %s, permintaan resepmu:\n\n%s \n\nsudah dikirim ke apoteker. Antrian kamu adalah %d. Mohon ditunggu.", patientDetails.PatientName, formattedMeds, currentQueueNumber)
 
 			if patientDetails.PatientPhoneNumber != "-" {
 				uc.SendMessage(patientDetails.PatientPhoneNumber, msgToPatient)
