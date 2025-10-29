@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
+	"sync"
 
 	// "regexp"
 	"strings"
@@ -61,6 +61,7 @@ type MessageContent struct {
 
 var Queue = 1
 var DateNow = time.Now().Format("2006-01-02")
+var queueMutex = &sync.Mutex{}
 
 // ProcessWebhookMessage handles incoming webhook messages using a state machine
 func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) error {
@@ -139,21 +140,37 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 				return err
 			}
 
-			log.Printf(
-				"Parsed Request: Doctor=%s, Patient=%s, Meds=%s, Phone=%s, DOB=%s",
-				patientDetails.DoctorName,
-				patientDetails.PatientName,
-				patientDetails.Medication,
-				patientDetails.PatientPhoneNumber,
-				patientDetails.PatientBirthDate,
-			)
+			// --- START NEW QUEUE LOGIC ---
 
-			err = uc.sheetService.AddPrescriptionRow(patientDetails, Queue)
+			// 1. Lock the mutex to prevent other requests from
+			//    reading/writing the queue at the same time.
+			queueMutex.Lock()
+
+			// 2. Check if it's a new day
+			today := time.Now().Format("2006-01-02")
+			if DateNow != today {
+				Queue = 1       // Reset queue to 1
+				DateNow = today // Update the date to today
+			}
+
+			// 3. Get the queue number for *this* request
+			currentQueueNumber := Queue
+
+			// 4. Increment the global Queue for the *next* request
+			Queue += 1
+
+			// 5. Unlock the mutex so other requests can continue
+			queueMutex.Unlock()
+
+			// --- END NEW QUEUE LOGIC ---
+
+			err = uc.sheetService.AddPrescriptionRow(patientDetails, currentQueueNumber)
 			if err != nil {
 				// If it fails, tell the doctor but maybe still send to pharmacy
 				uc.SendMessage(phoneNumber, "Note: Gagal untuk menyimpan ke spreadsheet, tetapi tetap akan dikirim ke apoteker.")
 				// You can decide if you want to stop here or continue
 			}
+
 			originalMeds := patientDetails.Medication
 
 			medParts := strings.Split(originalMeds, ",")
@@ -171,20 +188,13 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 			// **SEND TO PHARMACY LOGIC HERE**
 			pharmacyNumber := config.LoadConfig().PharmacyNumber
 			// Send the pending message to the pharmacy number
-			msgToPharmacy := fmt.Sprintf("Permintaan resep obat baru:\n\n%s \n\nDengan nomor Antrian: %d\n\nObat ini untuk:\n%s\n%s\n%s\n\nDari:\nDokter %s", formattedMeds, Queue, patientDetails.PatientName, patientDetails.PatientBirthDate, patientDetails.PatientPhoneNumber, patientDetails.DoctorName)
+			msgToPharmacy := fmt.Sprintf("Permintaan resep obat baru:\n\n%s \n\nDengan nomor Antrian: %d\n\nObat ini untuk:\n%s\n%s\n%s\n\nDari:\nDokter %s", formattedMeds, currentQueueNumber, patientDetails.PatientName, patientDetails.PatientBirthDate, patientDetails.PatientPhoneNumber, patientDetails.DoctorName)
 			err = uc.SendMessage(pharmacyNumber, msgToPharmacy)
 			if err != nil {
 				uc.SendMessage(phoneNumber, "Gagal mengirim pesan ke apoteker. Mohon coba kembali lagi nanti.")
 				return err
 			}
-			msgToPatient := fmt.Sprintf("Halo %s, permintaan resepmu:\n\n%s \n\nsudah dikirim ke apoteker. Antrian kamu adalah %d. Mohon ditunggu informasi selanjutnya dari apoteker.", patientDetails.PatientName, formattedMeds, Queue)
-
-			if DateNow != time.Now().Format("2006-01-02") {
-				Queue = 1
-				DateNow = time.Now().Format("2006-01-02")
-			} else {
-				Queue += 1
-			}
+			msgToPatient := fmt.Sprintf("Halo %s, permintaan resepmu:\n\n%s \n\nsudah dikirim ke apoteker. Antrian kamu adalah %d. Mohon ditunggu informasi selanjutnya dari apoteker.", patientDetails.PatientName, formattedMeds, currentQueueNumber)
 
 			if patientDetails.PatientPhoneNumber != "-" {
 				uc.SendMessage(patientDetails.PatientPhoneNumber, msgToPatient)
