@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"telegram-doctor-recipe-helper-bot/internal/app/exception"
@@ -41,7 +42,8 @@ func ParsePatientDetails(message string) (*PatientDetails, error) {
 	rawRegistryNum := parsedFields["No Regis"]
 	details.RegistryNum = normalizeRegistryNum(rawRegistryNum)
 
-	details.Medication = parsedFields["Resep Obat"]
+	rawMedication := parsedFields["Resep Obat"]
+	details.Medication = normalizeMedication(rawMedication)
 
 	// Normalize phone number before assigning
 	rawPhone := parsedFields["Nomor Telpon Pasien"]
@@ -98,4 +100,20 @@ func normalizeRegistryNum(input string) string {
 
 	// Otherwise, return the original string
 	return input
+}
+
+func normalizeMedication(input string) string {
+	medParts := strings.Split(input, ",")
+
+	numberedMedParts := make([]string, len(medParts))
+
+	for i, part := range medParts {
+		trimmedPart := strings.TrimSpace(part)
+		// Format as "1. Item", "2. Item", etc.
+		numberedMedParts[i] = fmt.Sprintf("%d. %s", i+1, trimmedPart)
+	}
+
+	formattedMeds := strings.Join(numberedMedParts, ",\n")
+
+	return formattedMeds
 }

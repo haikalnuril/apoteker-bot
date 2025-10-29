@@ -171,30 +171,16 @@ func (uc *messageUseCase) ProcessWebhookMessage(webhookData *WebhookMessage) err
 				// You can decide if you want to stop here or continue
 			}
 
-			originalMeds := patientDetails.Medication
-
-			medParts := strings.Split(originalMeds, ",")
-
-			numberedMedParts := make([]string, len(medParts))
-
-			for i, part := range medParts {
-				trimmedPart := strings.TrimSpace(part)
-				// Format as "1. Item", "2. Item", etc.
-				numberedMedParts[i] = fmt.Sprintf("%d. %s", i+1, trimmedPart)
-			}
-
-			formattedMeds := strings.Join(numberedMedParts, ",\n")
-
 			// **SEND TO PHARMACY LOGIC HERE**
 			pharmacyNumber := config.LoadConfig().PharmacyNumber
 			// Send the pending message to the pharmacy number
-			msgToPharmacy := fmt.Sprintf("Permintaan resep obat baru:\n\n%s \n\nDengan nomor Antrian: %d\n\nObat ini untuk:\n%s\n%s\n%s\n\nDari:\nDokter %s", formattedMeds, currentQueueNumber, patientDetails.PatientName, patientDetails.PatientBirthDate, patientDetails.PatientPhoneNumber, patientDetails.DoctorName)
+			msgToPharmacy := fmt.Sprintf("Permintaan resep obat baru:\n\n%s \n\nDengan nomor Antrian: %d\n\nObat ini untuk:\n%s\n%s\n%s\n\nDari:\nDokter %s", patientDetails.Medication, currentQueueNumber, patientDetails.PatientName, patientDetails.PatientBirthDate, patientDetails.PatientPhoneNumber, patientDetails.DoctorName)
 			err = uc.SendMessage(pharmacyNumber, msgToPharmacy)
 			if err != nil {
 				uc.SendMessage(phoneNumber, "Gagal mengirim pesan ke apoteker. Mohon coba kembali lagi nanti.")
 				return err
 			}
-			msgToPatient := fmt.Sprintf("Halo %s, permintaan resepmu:\n\n%s \n\nsudah dikirim ke apoteker. Antrian kamu adalah %d. Mohon ditunggu.", patientDetails.PatientName, formattedMeds, currentQueueNumber)
+			msgToPatient := fmt.Sprintf("Halo %s, permintaan resepmu:\n\n%s \n\nsudah dikirim ke apoteker. Antrian kamu adalah %d. Mohon ditunggu.", patientDetails.PatientName, patientDetails.Medication, currentQueueNumber)
 
 			if patientDetails.PatientPhoneNumber != "-" {
 				uc.SendMessage(patientDetails.PatientPhoneNumber, msgToPatient)
